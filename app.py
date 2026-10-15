@@ -34,7 +34,7 @@ st.markdown("""
 def get_connection():
     return psycopg2.connect(st.secrets["DB_URL"])
 
-# สร้างตารางถ้ายังไม่มี (เพิ่มตาราง budgets สำหรับเก็บงบประมาณ)
+# สร้างตารางถ้ายังไม่มี
 def init_db():
     try:
         conn = get_connection()
@@ -94,6 +94,15 @@ total_income = df[df['trans_type'] == 'รายรับ']['amount'].sum() if n
 total_expense = df[df['trans_type'] == 'รายจ่าย']['amount'].sum() if not df.empty else 0
 balance = total_income - total_expense
 
+# ฟังก์ชันแปลงชื่อคอลัมน์ตารางเป็นภาษาไทย
+def format_display_df(dataframe):
+    if dataframe.empty:
+        return dataframe
+    # เลือกเฉพาะคอลัมน์หลักและเปลี่ยนชื่อหัวตาราง
+    display_df = dataframe[['trans_date', 'trans_type', 'category', 'amount', 'note']].copy()
+    display_df.columns = ['วันที่ทำรายการ', 'ประเภทรายการ', 'หมวดหมู่', 'จำนวนเงิน', 'บันทึกช่วยจำ']
+    return display_df
+
 # ----------------- 1. หน้าแรก (Dashboard) -----------------
 if menu == "🏠 หน้าแรก (Dashboard)":
     st.markdown("<p class='main-header'>💸 ภาพรวมบัญชีของคุณ</p>", unsafe_allow_html=True)
@@ -133,7 +142,7 @@ if menu == "🏠 หน้าแรก (Dashboard)":
             st.info("ยังไม่มีข้อมูลรายจ่ายในระบบ")
             
         st.markdown("### 🕒 รายการล่าสุด")
-        st.dataframe(df[['trans_date', 'trans_type', 'category', 'amount', 'note']].head(5), use_container_width=True)
+        st.dataframe(format_display_df(df).head(5), use_container_width=True)
     else:
         st.info("ยังไม่มีข้อมูลการเงินในระบบ ลองไปที่เมนู 'เพิ่มรายการ' ได้เลยครับ")
 
@@ -193,7 +202,10 @@ elif menu == "🎯 ตั้งเป้าหมายงบประมาณ 
             
     st.markdown("### 📋 งบประมาณที่คุณตั้งไว้ทั้งหมด")
     if not df_budgets.empty:
-        st.dataframe(df_budgets, use_container_width=True)
+        # แปลงหัวตารางงบประมาณเป็นไทยด้วยเช่นกัน
+        df_budgets_display = df_budgets.copy()
+        df_budgets_display.columns = ['หมวดหมู่', 'งบประมาณสูงสุด']
+        st.dataframe(df_budgets_display, use_container_width=True)
     else:
         st.info("ยังไม่มีการตั้งงบประมาณในระบบ")
 
@@ -208,6 +220,6 @@ elif menu == "📜 ประวัติรายการ (Statement)":
         else:
             filtered_df = df
             
-        st.dataframe(filtered_df[['วันที่', 'ประเภทรายการ', 'หมวดหมู่', 'จำนวนเงิน', 'บันทึกช่วยจำ']], use_container_width=True)
+        st.dataframe(format_display_df(filtered_df), use_container_width=True)
     else:
         st.info("ยังไม่มีประวัติรายการในระบบครับ")
