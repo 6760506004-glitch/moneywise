@@ -208,6 +208,6 @@ elif menu == "📜 ประวัติรายการ (Statement)":
         else:
             filtered_df = df
             
-        st.dataframe(filtered_df[['trans_date', 'trans_type', 'category', 'amount', 'note']], use_container_width=True)
+        st.dataframe(filtered_df[['วันที่', 'ประเภทรายการ', 'หมวดหมู่', 'จำนวนเงิน', 'บันทึกช่วยจำ']], use_container_width=True)
     else:
         st.info("ยังไม่มีประวัติรายการในระบบครับ")
