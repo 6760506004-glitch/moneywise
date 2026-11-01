@@ -1,5 +1,5 @@
 import streamlit as st
-import psycopg2
+import sqlite3
 import pandas as pd
 from datetime import datetime
 
@@ -30,9 +30,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# เชื่อมต่อฐานข้อมูล Supabase
+# เชื่อมต่อฐานข้อมูล SQLite ในเครื่อง (ไม่ต้องใช้เน็ตและไม่ต้องใช้ secrets)
 def get_connection():
-    return psycopg2.connect(st.secrets["DB_URL"])
+    return sqlite3.connect("moneywise.db")
 
 # สร้างตารางถ้ายังไม่มี
 def init_db():
@@ -41,18 +41,18 @@ def init_db():
         cur = conn.cursor()
         cur.execute("""
             CREATE TABLE IF NOT EXISTS transactions (
-                id SERIAL PRIMARY KEY,
-                trans_date DATE,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                trans_date TEXT,
                 trans_type TEXT,
                 category TEXT,
-                amount NUMERIC,
+                amount REAL,
                 note TEXT
             )
         """)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS budgets (
                 category TEXT PRIMARY KEY,
-                limit_amount NUMERIC
+                limit_amount REAL
             )
         """)
         conn.commit()
@@ -98,7 +98,6 @@ balance = total_income - total_expense
 def format_display_df(dataframe):
     if dataframe.empty:
         return dataframe
-    # เลือกเฉพาะคอลัมน์หลักและเปลี่ยนชื่อหัวตาราง
     display_df = dataframe[['trans_date', 'trans_type', 'category', 'amount', 'note']].copy()
     display_df.columns = ['วันที่ทำรายการ', 'ประเภทรายการ', 'หมวดหมู่', 'จำนวนเงิน', 'บันทึกช่วยจำ']
     return display_df
@@ -125,7 +124,6 @@ if menu == "🏠 หน้าแรก (Dashboard)":
             cat_expense = expense_df.groupby('category')['amount'].sum()
             st.bar_chart(cat_expense)
             
-            # เช็กงบประมาณเทียบกับที่ใช้ไปจริง
             if not df_budgets.empty:
                 st.markdown("### 🎯 สถานะงบประมาณของคุณ")
                 for index, row in df_budgets.iterrows():
@@ -169,8 +167,8 @@ elif menu == "➕ เพิ่มรายการ (Income/Expense)":
                 conn = get_connection()
                 cur = conn.cursor()
                 cur.execute(
-                    "INSERT INTO transactions (trans_date, trans_type, category, amount, note) VALUES (%s, %s, %s, %s, %s)",
-                    (trans_date, trans_type, category, amount, note)
+                    "INSERT INTO transactions (trans_date, trans_type, category, amount, note) VALUES (?, ?, ?, ?, ?)",
+                    (str(trans_date), trans_type, category, amount, note)
                 )
                 conn.commit()
                 cur.close()
@@ -192,7 +190,7 @@ elif menu == "🎯 ตั้งเป้าหมายงบประมาณ 
             conn = get_connection()
             cur = conn.cursor()
             cur.execute(
-                "INSERT INTO budgets (category, limit_amount) VALUES (%s, %s) ON CONFLICT (category) DO UPDATE SET limit_amount = EXCLUDED.limit_amount",
+                "INSERT INTO budgets (category, limit_amount) VALUES (?, ?) ON CONFLICT(category) DO UPDATE SET limit_amount =excluded.limit_amount",
                 (b_category, b_limit)
             )
             conn.commit()
@@ -202,7 +200,6 @@ elif menu == "🎯 ตั้งเป้าหมายงบประมาณ 
             
     st.markdown("### 📋 งบประมาณที่คุณตั้งไว้ทั้งหมด")
     if not df_budgets.empty:
-        # แปลงหัวตารางงบประมาณเป็นไทยด้วยเช่นกัน
         df_budgets_display = df_budgets.copy()
         df_budgets_display.columns = ['หมวดหมู่', 'งบประมาณสูงสุด']
         st.dataframe(df_budgets_display, use_container_width=True)
